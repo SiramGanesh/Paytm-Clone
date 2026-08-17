@@ -1,8 +1,6 @@
 const mongoose = require("mongoose");
 
-mongoose.connect("mongodb+srv://navadeepsiram_db_user:gF1xlK42mQbLYg1C@cluster0.rhljgtb.mongodb.net/paytm");
-
-const userSchema = mongoose.Schema({
+const userSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true,
@@ -33,7 +31,7 @@ const userSchema = mongoose.Schema({
 
 const accountSchema = new mongoose.Schema({
     userId: {
-        type: mongoose.Schema.Types.ObjectId, // Reference to User model
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },

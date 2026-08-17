@@ -1,45 +1,39 @@
 const express = require('express');
 const zod = require("zod");
-const { User } = require("../db");
+const { User, Account } = require("../db");
 const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = require("../config");
+const { authMiddleware } = require("../middleware");
 
 const router = express.Router();
 
 const signupBody = zod.object({
     username: zod.string().email(),
-    firstname: zod.string(),
-    lastname: zod.string(),
+    firstName: zod.string(),
+    lastName: zod.string(),
     password: zod.string()
 });
 
 const signinBody = zod.object({
-    username:zod.string().email(),
-    password:zod.string()
+    username: zod.string().email(),
+    password: zod.string()
 });
 
 const updateBody = zod.object({
-	password: zod.string().optional(),
+    password: zod.string().optional(),
     firstName: zod.string().optional(),
     lastName: zod.string().optional(),
 });
 
 router.post("/signup", async (req, res) => {
     const { success } = signupBody.safeParse(req.body);
-    if(!success){
-        return res.status(411).json({
-            message:"incorrect inputs"
-        });
+    if (!success) {
+        return res.status(411).json({ message: "Incorrect inputs" });
     }
 
-    const existingUser = await User.findOne({
-        username: req.body.username
-    });
-
-    if(existingUser){
-        return res.status(411).json({
-            message: "Email already taken"
-        });
+    const existingUser = await User.findOne({ username: req.body.username });
+    if (existingUser) {
+        return res.status(411).json({ message: "Email already taken" });
     }
 
     const user = await User.create({
@@ -48,27 +42,26 @@ router.post("/signup", async (req, res) => {
         firstName: req.body.firstName,
         lastName: req.body.lastName
     });
+
     const userId = user._id;
 
     await Account.create({
         userId,
         balance: 1 + Math.random() * 10000
-    })
+    });
 
-    const token = jwt.sign({
-        userId
-    }, JWT_SECRET);
+    const token = jwt.sign({ userId }, JWT_SECRET);
 
     res.json({
         message: "User created successfully",
-        token: token
-    })
+        token
+    });
 });
 
-router.post("/signin", async (req,res) => {
+router.post("/signin", async (req, res) => {
     const { success } = signinBody.safeParse(req.body);
-    if(!success){
-        return res.status(411).json({message:"Incorrect Inputs"});
+    if (!success) {
+        return res.status(411).json({ message: "Incorrect inputs" });
     }
 
     const user = await User.findOne({
@@ -76,49 +69,37 @@ router.post("/signin", async (req,res) => {
         password: req.body.password
     });
 
-    if(user){
-        const token = jwt.sign({
-            userId:user._id
-        }, JWT_SECRET);
+    if (user) {
+        const token = jwt.sign({ userId: user._id }, JWT_SECRET);
+        return res.json({ token });
     }
 
-    res.status(411).json({
-        message: "Error while logging in"
-    })
+    return res.status(411).json({ message: "Error while logging in" });
 });
 
 router.put("/", authMiddleware, async (req, res) => {
-    const { success } = updateBody.safeParse(req.body)
+    const { success } = updateBody.safeParse(req.body);
     if (!success) {
-        res.status(411).json({
-            message: "Error while updating information"
-        })
+        return res.status(411).json({ message: "Error while updating information" });
     }
 
-		await User.updateOne({ _id: req.userId }, req.body);
-	
-    res.json({
-        message: "Updated successfully"
-    })
+    await User.updateOne({ _id: req.userId }, req.body);
+
+    res.json({ message: "Updated successfully" });
 });
 
-router.get("/bulk", async (req,res) => {
+router.get("/bulk", async (req, res) => {
     const filter = req.query.filter || "";
 
     const users = await User.find({
-        $or:[{
-            firstName: {
-                "$regex":filter
-            }
-        },{
-            lastName: {
-                "$regex": filter
-            }
-        }]
-    })
+        $or: [
+            { firstName: { $regex: filter, $options: "i" } },
+            { lastName: { $regex: filter, $options: "i" } }
+        ]
+    });
 
-     res.json({
-        user: users.map(user => ({
+    res.json({
+        users: users.map(user => ({
             username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
